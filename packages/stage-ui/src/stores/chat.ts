@@ -187,7 +187,7 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
 
           categorizer.consume(literal)
 
-          const speechOnly = categorizer.filterToSpeech(literal, streamPosition)
+          const speechOnly = categorizer.filterToSpeech(literal, streamPosition).replace(/\*[^*]+\*/g, '')
           streamPosition += literal.length
 
           if (speechOnly.trim()) {

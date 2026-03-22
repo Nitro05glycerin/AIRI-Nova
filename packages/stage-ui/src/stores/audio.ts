@@ -74,7 +74,7 @@ export const useAudioContext = defineStore('audio-context', () => {
   }
 })
 
-export function useAudioDevice(requestPermission: boolean = false) {
+export function useAudioDevice(requestPermission: boolean = true) {
   const devices = useDevicesList({ constraints: { audio: true }, requestPermissions: requestPermission })
   const audioInputs = computed(() => devices.audioInputs.value)
   const selectedAudioInput = ref<string>(devices.audioInputs.value.find(device => device.deviceId === 'default')?.deviceId || '')

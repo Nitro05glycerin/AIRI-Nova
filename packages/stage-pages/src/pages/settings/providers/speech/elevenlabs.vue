@@ -66,14 +66,26 @@ async function handleGenerateSpeech(input: string, voiceId: string, _useSSML: bo
     input,
     voiceId,
     {
-      ...providerConfig,
       ...defaultVoiceSettings,
+      ...providerConfig,
     },
   )
 }
 
 onMounted(async () => {
   const providerConfig = providersStore.getProviderConfig(providerId)
+
+  // Load persisted voice settings into local refs
+  if (providerConfig) {
+    pitch.value = (providerConfig.pitch as number) ?? pitch.value
+    speed.value = (providerConfig.speed as number) ?? speed.value
+    volume.value = (providerConfig.volume as number) ?? volume.value
+    style.value = (providerConfig.style as number) ?? style.value
+    stability.value = (providerConfig.stability as number) ?? stability.value
+    similarityBoost.value = (providerConfig.similarityBoost as number) ?? similarityBoost.value
+    useSpeakerBoost.value = (providerConfig.useSpeakerBoost as boolean) ?? useSpeakerBoost.value
+  }
+
   const providerMetadata = providersStore.getProviderMetadata(providerId)
   if (await providerMetadata.validators.validateProviderConfig(providerConfig)) {
     await speechStore.loadVoicesForProvider(providerId)

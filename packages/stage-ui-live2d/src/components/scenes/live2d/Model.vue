@@ -22,6 +22,7 @@ import {
   useMotionUpdatePluginBeatSync,
   useMotionUpdatePluginIdleDisable,
   useMotionUpdatePluginIdleFocus,
+  useMotionUpdatePluginSpeakingFocus,
 } from '../../../composables/live2d'
 import { Emotion, EmotionNeutralMotionName } from '../../../constants/emotions'
 import { useLive2d } from '../../../stores/live2d'
@@ -183,6 +184,8 @@ const {
   availableMotions,
   motionMap,
   modelParameters,
+  expressionParams,
+  itemParams,
 } = storeToRefs(live2dStore)
 
 const themeColorsHue = toRef(() => props.themeColorsHue)
@@ -354,6 +357,7 @@ async function loadModel() {
     motionManagerUpdate.register(useMotionUpdatePluginIdleDisable(), 'pre')
     motionManagerUpdate.register(useMotionUpdatePluginIdleFocus(), 'post')
     motionManagerUpdate.register(useMotionUpdatePluginAutoEyeBlink(), 'post')
+    motionManagerUpdate.register(useMotionUpdatePluginSpeakingFocus(mouthOpenSize), 'post')
 
     const hookedUpdate = motionManager.update as (model: PixiLive2DInternalModel['coreModel'], now: number) => boolean
     motionManager.update = function (model: PixiLive2DInternalModel['coreModel'], now: number) {
@@ -404,6 +408,15 @@ async function loadModel() {
     coreModel.setParameterValueById('ParamBodyAngleY', modelParameters.value.bodyAngleY)
     coreModel.setParameterValueById('ParamBodyAngleZ', modelParameters.value.bodyAngleZ)
     coreModel.setParameterValueById('ParamBreath', modelParameters.value.breath)
+
+    // Hide watermark by setting Param129 = 1 (kyokiStudio models use this to toggle watermark off)
+    try {
+      coreModel.setParameterValueById('Param129', 1)
+      console.info('[Live2D] Watermark hidden (Param129 = 1)')
+    }
+    catch (e) {
+      console.warn('[Live2D] Failed to hide watermark:', e)
+    }
 
     emits('modelLoaded')
   }
@@ -634,6 +647,15 @@ watch(() => modelParameters.value.rightEyebrowForm, (value) => {
   }
 })
 
+// Watch expression params (emotion overrides) and apply to core model
+watch(expressionParams, (params) => {
+  if (!model.value) return
+  const cm = model.value.internalModel.coreModel as any
+  for (const [paramId, value] of Object.entries(params)) {
+    try { cm.setParameterValueById(paramId, value) } catch {}
+  }
+}, { deep: true })
+
 // Watch for idle animation setting changes and stop motions if disabled
 watch(live2dIdleAnimationEnabled, (enabled) => {
   if (!enabled && model.value) {
@@ -644,6 +666,46 @@ watch(live2dIdleAnimationEnabled, (enabled) => {
   }
 })
 
+// Eye tracking: store latest target, apply in RAF loop so motion manager can't overwrite
+const eyeTarget = ref({ x: 0, y: 0 })
+let eyeTrackingLoopId: number | undefined
+
+function eyeTrackingLoop() {
+  if (model.value) {
+    const cm = model.value.internalModel.coreModel as any
+
+    if (mouthOpenSize.value <= 0 && document.hasFocus() && !props.disableFocusAt) {
+      // Eye tracking when window is focused and not speaking
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const eyeX = Math.max(-1, Math.min(1, ((eyeTarget.value.x / vw) * 2 - 1) * 1.5))
+      const eyeY = Math.max(-1, Math.min(1, ((eyeTarget.value.y / vh) * 2 - 1) * 1.5))
+      cm.setParameterValueById('ParamEyeBallX', eyeX)
+      cm.setParameterValueById('ParamEyeBallY', eyeY)
+    }
+
+    // Re-apply expression params every frame (motion manager may overwrite them)
+    const params = expressionParams.value
+    if (params && Object.keys(params).length > 0) {
+      for (const [paramId, value] of Object.entries(params)) {
+        try { cm.setParameterValueById(paramId, value) } catch {}
+      }
+    }
+
+    // Re-apply item params every frame (accessories, hairstyles, hand items)
+    const items = itemParams.value
+    if (items && Object.keys(items).length > 0) {
+      for (const [paramId, value] of Object.entries(items)) {
+        try { cm.setParameterValueById(paramId, value) } catch {}
+      }
+    }
+
+    // Keep watermark hidden
+    try { cm.setParameterValueById('Param129', 1) } catch {}
+  }
+  eyeTrackingLoopId = requestAnimationFrame(eyeTrackingLoop)
+}
+
 watch(focusAt, (value) => {
   if (!model.value)
     return
@@ -651,6 +713,7 @@ watch(focusAt, (value) => {
     return
 
   model.value.focus(value.x, value.y)
+  eyeTarget.value = { x: value.x, y: value.y }
 })
 
 onMounted(() => {
@@ -660,12 +723,17 @@ onMounted(() => {
 
 onMounted(async () => {
   updateDropShadowFilter()
+  eyeTrackingLoopId = requestAnimationFrame(eyeTrackingLoop)
 })
 
 onUnmounted(() => {
   isUnmounted = true
   resizeAnimation?.pause()
   disposeShouldUpdateView?.()
+  if (eyeTrackingLoopId) {
+    cancelAnimationFrame(eyeTrackingLoopId)
+    eyeTrackingLoopId = undefined
+  }
 })
 
 function listMotionGroups() {

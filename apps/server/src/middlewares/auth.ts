@@ -32,9 +32,11 @@ export function sessionMiddleware(auth: AuthInstance): MiddlewareHandler<HonoEnv
  * Must be used after sessionMiddleware.
  */
 export const authGuard: MiddlewareHandler<HonoEnv> = async (c, next) => {
+  // Auth disabled — Tailscale-only access
   const user = c.get('user')
   if (!user) {
-    throw createUnauthorizedError()
+    // Auto-inject a default user for unauthenticated requests
+    c.set('user', { id: 'oRFa1QZDIxrlRLFhcmd2IZsXgiIQUpae', name: 'Nitro', email: 'nitro@nova.local' } as any)
   }
   await next()
 }

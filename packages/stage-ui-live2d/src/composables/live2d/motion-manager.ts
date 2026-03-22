@@ -195,8 +195,10 @@ export function useMotionUpdatePluginIdleDisable(idleEyeFocus = useLive2DIdleEye
     if (!ctx.live2dIdleAnimationEnabled.value && ctx.isIdleMotion) {
       ctx.motionManager.stopAllMotions()
 
-      // Still update eye focus and blink even if idle motion is stopped
-      idleEyeFocus.update(ctx.internalModel, ctx.now)
+      // Only run idle eye saccades when window is not focused
+      if (!document.hasFocus()) {
+        idleEyeFocus.update(ctx.internalModel, ctx.now)
+      }
       if (ctx.internalModel.eyeBlink != null) {
         ctx.internalModel.eyeBlink.updateParameters(ctx.model, ctx.timeDelta / 1000)
       }
@@ -210,12 +212,30 @@ export function useMotionUpdatePluginIdleDisable(idleEyeFocus = useLive2DIdleEye
   }
 }
 
+export function useMotionUpdatePluginSpeakingFocus(mouthOpenSize: Ref<number>): MotionManagerPlugin {
+  return (ctx) => {
+    if (mouthOpenSize.value > 0) {
+      // When speaking, force looking straight at the camera
+      ctx.model.setParameterValueById('ParamAngleX', 0)
+      ctx.model.setParameterValueById('ParamAngleY', 0)
+      ctx.model.setParameterValueById('ParamAngleZ', 0)
+      ctx.model.setParameterValueById('ParamBodyAngleX', 0)
+      ctx.model.setParameterValueById('ParamEyeBallX', 0)
+      ctx.model.setParameterValueById('ParamEyeBallY', 0)
+    }
+  }
+}
+
 export function useMotionUpdatePluginIdleFocus(idleEyeFocus = useLive2DIdleEyeFocus()): MotionManagerPlugin {
   return (ctx) => {
     if (!ctx.isIdleMotion || ctx.handled)
       return
 
-    idleEyeFocus.update(ctx.internalModel, ctx.now)
+    // Only run idle saccades when the window is not focused;
+    // when focused, mouse-driven eye tracking takes over in Model.vue
+    if (!document.hasFocus()) {
+      idleEyeFocus.update(ctx.internalModel, ctx.now)
+    }
   }
 }
 

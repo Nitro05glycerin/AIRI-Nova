@@ -44,8 +44,8 @@ export function useVAD(workerUrl: string, options?: UseVADOptions) {
       vad.value = await createVAD({
         sampleRate: 16000,
         speechThreshold: threshold.value,
-        exitThreshold: (threshold.value ?? 0.6) * 0.3,
-        minSilenceDurationMs: 400,
+        exitThreshold: (threshold.value ?? 0.6) * 0.58,
+        minSilenceDurationMs: 800,
       })
 
       // Set up event handlers
@@ -120,7 +120,7 @@ export function useVAD(workerUrl: string, options?: UseVADOptions) {
 
   watch(threshold, (newVal) => {
     if (vad.value && newVal) {
-      vad.value.updateConfig({ speechThreshold: newVal, exitThreshold: newVal * 0.3 })
+      vad.value.updateConfig({ speechThreshold: newVal, exitThreshold: newVal * 0.58 })
     }
   })
 

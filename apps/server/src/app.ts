@@ -128,7 +128,7 @@ async function createApp() {
   const db = injeca.provide('services:db', {
     dependsOn: { env: parsedEnv, lifecycle },
     build: async ({ dependsOn }) => {
-      const { db: dbInstance, pool } = createDrizzle(dependsOn.env.DATABASE_URL)
+      const { db: dbInstance, pool } = await createDrizzle(dependsOn.env.DATABASE_URL)
       await dbInstance.execute('SELECT 1')
       logger.log('Connected to database')
       await migrateDatabase(dbInstance)
@@ -175,7 +175,12 @@ async function createApp() {
 }
 
 // eslint-disable-next-line antfu/no-top-level-await
-serve(await createApp())
+const server = serve(await createApp())
+
+// Keep process alive (PGlite workaround)
+const keepalive = setInterval(() => {}, 1 << 30)
+process.on('SIGTERM', () => { clearInterval(keepalive); server.close() })
+process.on('SIGINT', () => { clearInterval(keepalive); server.close() })
 
 function handleError(error: unknown, type: string) {
   useLogger().withError(error).error(type)

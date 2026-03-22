@@ -24,7 +24,7 @@ import { generateSpeech } from '@xsai/generate-speech'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
-import { useDelayMessageQueue, useEmotionsMessageQueue } from '../../composables/queues'
+import { useDelayMessageQueue, useEmotionsMessageQueue, useItemMessageQueue } from '../../composables/queues'
 import { llmInferenceEndToken } from '../../constants'
 import { EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, EmotionThinkMotionName } from '../../constants/emotions'
 import { useAudioContext, useSpeakingStore } from '../../stores/audio'
@@ -129,7 +129,31 @@ const emotionsQueue = createQueue<EmotionPayload>({
         await vrmViewerRef.value!.setExpression(value, ctx.data.intensity)
       }
       else if (stageModelRenderer.value === 'live2d') {
-        currentMotion.value = { group: EMOTION_EmotionMotionName_value[ctx.data.name] }
+        // Try motion group first (works for models with named motion groups)
+        const motionGroup = EMOTION_EmotionMotionName_value[ctx.data.name]
+        currentMotion.value = { group: motionGroup }
+
+        // Also apply expression parameters via the store for models that use param-based expressions
+        // (e.g. kyokiStudio models where emotions are .exp3.json parameter sets)
+        // Reset all emotion params first, then set the active ones
+        const emotionResetParams: Record<string, number> = {
+          Param9: 0, Param10: 0, Param12: 0, Param95: 0, Param94: 0,
+          Param96: 0, Param87: 0, Param88: 0, Param97: 0,
+        }
+        const emotionMap: Record<string, Record<string, number>> = {
+          angry: { Param9: 1 },
+          sad: { Param12: 1 },
+          happy: { Param95: 1 },
+          think: {},
+          surprised: { Param97: 1 },
+          curious: { Param96: 1, Param87: 1 },
+          awkward: { Param97: 1, Param94: 1 },
+          question: { Param94: 1 },
+          neutral: {},
+        }
+        const params = { ...emotionResetParams, ...(emotionMap[ctx.data.name] ?? {}) }
+        live2dStore.expressionParams = params
+        console.debug('[Live2D] Applied emotion params:', ctx.data.name, params)
       }
     },
   ],
@@ -147,10 +171,38 @@ delaysQueue.onHandlerEvent('delay', (delay) => {
   console.debug('delay detected', delay)
 })
 
+const ITEM_PARAM_MAP: Record<string, Record<string, number>> = {
+  glasses: { Param8: 1 },
+  hat: { Param11: 1 },
+  ears: { Param90: 1 },
+  bear: { Param5: 1, Param3: 1, Param152: 1 },
+  pillow: { Param123: 1 },
+  pen: { Param128: 1, Param4: 1, Param152: 1 },
+  game: { Param3: 1, Param152: 1 },
+  coat: { Param22: 1 },
+  sweater: { Param22: 1, Param147: 1, Param148: 1 },
+  earphones: { Param7: 1 },
+  eat: { Param6: 1, Param152: 1 },
+  mouse: { Param139: 1 },
+  whiteboard: { Param127: 1 },
+  'sticky note': { Param57: 1 },
+  none: {},
+}
+
+const itemsQueue = useItemMessageQueue()
+itemsQueue.onHandlerEvent('item', (itemName: string) => {
+  console.debug('item token detected', itemName)
+  const params = ITEM_PARAM_MAP[itemName]
+  if (params !== undefined) {
+    live2dStore.itemParams = { ...params }
+  }
+})
+
 // Play special token: delay or emotion
 function playSpecialToken(special: string) {
   delaysQueue.enqueue(special)
   emotionMessageContentQueue.enqueue(special)
+  itemsQueue.enqueue(special)
 }
 const lipSyncNode = ref<AudioNode>()
 
@@ -293,9 +345,16 @@ const speechPipeline = createSpeechPipeline<AudioBuffer>({
     if (!model || !voice)
       return null
 
+    const cleanedText = request.text
+      .replace(/\*[^*]+\*/g, '')
+      .replace(/<action>[^<]*<\/action>/g, '')
+      .trim()
+    if (!cleanedText)
+      return null
+
     const input = ssmlEnabled.value
-      ? speechStore.generateSSML(request.text, voice, { ...providerConfig, pitch: pitch.value })
-      : request.text
+      ? speechStore.generateSSML(cleanedText, voice, { ...providerConfig, pitch: pitch.value })
+      : cleanedText
 
     try {
       const res = await generateSpeech({
@@ -479,8 +538,8 @@ chatHookCleanups.push(onTokenLiteral(async (literal) => {
 }))
 
 chatHookCleanups.push(onTokenSpecial(async (special) => {
-  // console.debug('Stage received special token:', special)
   currentChatIntent?.writeSpecial(special)
+  playSpecialToken(special)
 }))
 
 chatHookCleanups.push(onStreamEnd(async () => {

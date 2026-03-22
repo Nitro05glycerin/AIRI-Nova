@@ -545,6 +545,7 @@ export const useChatSessionStore = defineStore('chat-session', () => {
     messages,
 
     setActiveSession,
+    createSession,
     cleanupMessages,
     getAllSessions,
     resetAllSessions,

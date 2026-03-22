@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
 import { defaultModelParameters, useLive2d } from '@proj-airi/stage-ui-live2d'
 import { OPFSCache } from '@proj-airi/stage-ui-live2d/utils/opfs-loader'
 import { Button, Checkbox, FieldRange, SelectTab } from '@proj-airi/ui'
@@ -35,7 +36,121 @@ const {
   position,
   modelParameters,
   currentMotion,
+  itemParams,
 } = storeToRefs(live2d)
+
+// ---- Accessories & Items ----
+const EMOTION_PARAMS = new Set(['Param9', 'Param10', 'Param12', 'Param94', 'Param95', 'Param96', 'Param87', 'Param88', 'Param97'])
+
+interface AccessoryDef { label: string, params: Record<string, number> }
+interface RadioOption { label: string, params: Record<string, number> }
+
+const accessories: AccessoryDef[] = [
+  { label: 'Glasses', params: { Param8: 1 } },
+  { label: 'Hat', params: { Param11: 1 } },
+  { label: 'Cat Ears', params: { Param90: 1 } },
+  { label: 'Box', params: { Param74: 1 } },
+  { label: 'Pillow', params: { Param123: 1 } },
+  { label: 'Sticky Note', params: { Param57: 1 } },
+  { label: 'White Board', params: { Param127: 1 } },
+  { label: 'Mouse', params: { Param139: 0.964 } },
+  { label: 'Coat', params: { Param22: 1 } },
+  { label: 'Sweater', params: { Param148: 1 } },
+  { label: 'Flying', params: { Param: 1 } },
+]
+
+const hairstyles: RadioOption[] = [
+  { label: 'Default', params: {} },
+  { label: 'Black Braids', params: { Param16: 1 } },
+  { label: 'White Hair', params: { Param14: 1, Param15: 1, Param144: 1 } },
+  { label: 'White Ponytail', params: { Param14: 1, Param15: 1 } },
+  { label: 'White Hair Braids', params: { Param14: 1, Param15: 1, Param17: 1 } },
+  { label: 'Braided Pigtail', params: { Param62: 1, Param59: 1 } },
+  { label: 'Half-up', params: { Param62: 1, Param61: 1 } },
+  { label: 'Two Ball', params: { Param62: 1, Param125: 1 } },
+]
+
+const handItems: RadioOption[] = [
+  { label: 'None', params: {} },
+  { label: 'Teddy Bear', params: { Param5: 1, Param3: 1, Param152: 1 } },
+  { label: 'Pen (left)', params: { Param128: 1, Param4: 1, Param152: 1 } },
+  { label: 'Pen (right)', params: { Param139: 1, Param4: 1, Param152: 1 } },
+  { label: 'Eating', params: { Param6: 1, Param152: 1 } },
+  { label: 'Game Controller', params: { Param3: 1, Param152: 1 } },
+]
+
+// All hair-related param IDs for clearing
+const allHairParams = new Set(hairstyles.flatMap(h => Object.keys(h.params)))
+const allHandParams = new Set(handItems.flatMap(h => Object.keys(h.params)))
+
+// Restore saved state from localStorage
+const savedItems = (() => {
+  try {
+    const raw = localStorage.getItem('settings/live2d/item-toggles')
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+})()
+
+const activeAccessories = ref<boolean[]>(savedItems?.accessories ?? accessories.map(() => false))
+const activeHairstyle = ref(savedItems?.hairstyle ?? 0)
+const activeHandItem = ref(savedItems?.handItem ?? 0)
+
+function saveItemState() {
+  localStorage.setItem('settings/live2d/item-toggles', JSON.stringify({
+    accessories: activeAccessories.value,
+    hairstyle: activeHairstyle.value,
+    handItem: activeHandItem.value,
+  }))
+}
+
+function rebuildItemParams() {
+  const result: Record<string, number> = {}
+
+  // Accessories — zero all accessory params first, then set active ones
+  for (const acc of accessories) {
+    for (const p of Object.keys(acc.params)) result[p] = 0
+  }
+  activeAccessories.value.forEach((active, idx) => {
+    if (active) Object.assign(result, accessories[idx].params)
+  })
+
+  // Hairstyle - first zero all hair params, then set active
+  for (const p of allHairParams) result[p] = 0
+  const hair = hairstyles[activeHairstyle.value]
+  if (hair) Object.assign(result, hair.params)
+
+  // Hand items - first zero all hand params, then set active
+  for (const p of allHandParams) result[p] = 0
+  const hand = handItems[activeHandItem.value]
+  if (hand) Object.assign(result, hand.params)
+
+  // Remove any emotion params we shouldn't touch
+  for (const p of EMOTION_PARAMS) delete result[p]
+
+  itemParams.value = result
+}
+
+function toggleAccessory(idx: number) {
+  activeAccessories.value[idx] = !activeAccessories.value[idx]
+  activeAccessories.value = [...activeAccessories.value] // trigger reactivity
+  rebuildItemParams()
+  saveItemState()
+}
+
+function setHairstyle(idx: number) {
+  activeHairstyle.value = idx
+  rebuildItemParams()
+  saveItemState()
+}
+
+function setHandItem(idx: number) {
+  activeHandItem.value = idx
+  rebuildItemParams()
+  saveItemState()
+}
+
+// Apply saved state on mount
+rebuildItemParams()
 
 const selectedRuntimeMotion = ref<string>('')
 const selectedRuntimeMotionName = ref<string>('')
@@ -645,5 +760,62 @@ onUnmounted(() => {
         </div>
       </template>
     </FieldRange>
+  </Section>
+  <Section
+    title="Expressions & Items"
+    icon="i-solar:hanger-2-bold-duotone"
+    :class="[
+      'rounded-xl',
+      'bg-white/80  dark:bg-black/75',
+      'backdrop-blur-lg',
+    ]"
+    size="sm"
+    :expand="false"
+  >
+    <!-- Accessories -->
+    <div mb-2 text-xs text-neutral-500 font-semibold dark:text-neutral-400>
+      Accessories
+    </div>
+    <div flex flex-col gap-2>
+      <label v-for="(acc, idx) in accessories" :key="idx" flex items-center gap-2 cursor-pointer>
+        <Checkbox
+          :model-value="activeAccessories[idx]"
+          @update:model-value="toggleAccessory(idx)"
+        />
+        <span text-sm>{{ acc.label }}</span>
+      </label>
+    </div>
+
+    <!-- Hairstyle -->
+    <div mb-2 mt-4 text-xs text-neutral-500 font-semibold dark:text-neutral-400>
+      Hairstyle
+    </div>
+    <div flex flex-col gap-1>
+      <button
+        v-for="(hair, idx) in hairstyles"
+        :key="idx"
+        w-full rounded px-3 py-1.5 text-left text-sm transition-colors
+        :class="activeHairstyle === idx ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'"
+        @click="setHairstyle(idx)"
+      >
+        {{ hair.label }}
+      </button>
+    </div>
+
+    <!-- Hand Items -->
+    <div mb-2 mt-4 text-xs text-neutral-500 font-semibold dark:text-neutral-400>
+      Hand Item
+    </div>
+    <div flex flex-col gap-1>
+      <button
+        v-for="(item, idx) in handItems"
+        :key="idx"
+        w-full rounded px-3 py-1.5 text-left text-sm transition-colors
+        :class="activeHandItem === idx ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'"
+        @click="setHandItem(idx)"
+      >
+        {{ item.label }}
+      </button>
+    </div>
   </Section>
 </template>

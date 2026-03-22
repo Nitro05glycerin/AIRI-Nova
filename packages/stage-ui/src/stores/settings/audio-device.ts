@@ -14,8 +14,17 @@ export const useSettingsAudioDevice = defineStore('settings-audio-devices', () =
     selectedAudioInputNonPersist.value = newValue
   })
 
-  watch(selectedAudioInputEnabledPersist, (val) => {
+  watch(selectedAudioInputEnabledPersist, async (val) => {
     if (val) {
+      // Ensure permissions first so devices are enumerated (Firefox requires getUserMedia before enumerateDevices)
+      if (audioInputs.value.length === 0) {
+        try { await askPermission() } catch {}
+      }
+      // If still no selected input, pick default
+      if (!selectedAudioInputPersist.value && audioInputs.value.length > 0) {
+        selectedAudioInputPersist.value = audioInputs.value.find(d => d.deviceId === 'default')?.deviceId || audioInputs.value[0].deviceId
+        selectedAudioInputNonPersist.value = selectedAudioInputPersist.value
+      }
       startStream()
     }
     else {

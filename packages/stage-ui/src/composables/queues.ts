@@ -23,8 +23,9 @@ export function useEmotionsMessageQueue(emotionsQueue: UseQueueReturn<EmotionPay
 
   function parseActEmotion(content: string) {
     const match = /<\|ACT\s*(?::\s*)?(\{[\s\S]*\})\|>/i.exec(content)
-    if (!match)
+    if (!match) {
       return { ok: false, emotion: null as EmotionPayload | null }
+    }
 
     const payloadText = match[1]
     try {
@@ -59,6 +60,36 @@ export function useEmotionsMessageQueue(emotionsQueue: UseQueueReturn<EmotionPay
         if (actParsed.ok && actParsed.emotion) {
           ctx.emit('emotion', actParsed.emotion)
           emotionsQueue.enqueue(actParsed.emotion)
+        }
+      },
+    ],
+  })
+}
+
+export function useItemMessageQueue() {
+  function parseItemToken(content: string) {
+    const match = /<\|ITEM\s*(?::\s*)?(\{[\s\S]*?\})\|>/i.exec(content)
+    if (!match)
+      return { ok: false, item: null as string | null }
+
+    try {
+      const payload = JSON.parse(match[1]) as { name?: string }
+      if (payload?.name && typeof payload.name === 'string')
+        return { ok: true, item: payload.name.toLowerCase() }
+    }
+    catch (e) {
+      console.warn(`[parseItemToken] Failed to parse ITEM payload: "${match[1]}"`, e)
+    }
+
+    return { ok: false, item: null as string | null }
+  }
+
+  return createQueue<string>({
+    handlers: [
+      async (ctx) => {
+        const parsed = parseItemToken(ctx.data)
+        if (parsed.ok && parsed.item) {
+          ctx.emit('item', parsed.item)
         }
       },
     ],

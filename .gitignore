@@ -123,3 +123,8 @@ plugins-development
 
 apps/stage-pocket/ios/buildServer.json
 .ghfs/
+sync-data.json
+sync-data.json.bak
+test-results.txt
+test-emotion-outfit.py
+apps/server/pglite-data/

@@ -106,7 +106,16 @@ async function handleSend() {
     return
   }
 
-  const textToSend = messageInput.value
+  const textToSend = messageInput.value.trim()
+
+  // Handle /new command — create a new chat session
+  if (textToSend === '/new') {
+    messageInput.value = ''
+    const characterId = chatSession.sessionMetas[chatSession.activeSessionId]?.characterId || 'default'
+    await chatSession.createSession(characterId, { setActive: true })
+    return
+  }
+
   messageInput.value = ''
 
   try {

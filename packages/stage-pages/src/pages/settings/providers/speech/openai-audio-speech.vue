@@ -94,8 +94,8 @@ async function handleGenerateSpeech(input: string, voiceId: string, _useSSML: bo
     input,
     voiceId,
     {
-      ...providerConfig,
       ...defaultVoiceSettings,
+      ...providerConfig,
     },
   )
 }

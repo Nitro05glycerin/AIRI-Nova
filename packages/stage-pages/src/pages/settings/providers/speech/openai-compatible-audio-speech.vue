@@ -120,8 +120,8 @@ async function handleGenerateSpeech(input: string, voiceId: string, _useSSML: bo
     input,
     voiceId || (voice.value as string),
     {
-      ...providerConfig,
       ...defaultVoiceSettings,
+      ...providerConfig,
       speed: speed.value,
     },
   )
