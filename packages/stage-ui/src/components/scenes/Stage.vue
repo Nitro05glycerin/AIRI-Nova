@@ -137,8 +137,15 @@ const emotionsQueue = createQueue<EmotionPayload>({
         // (e.g. kyokiStudio models where emotions are .exp3.json parameter sets)
         // Reset all emotion params first, then set the active ones
         const emotionResetParams: Record<string, number> = {
-          Param9: 0, Param10: 0, Param12: 0, Param95: 0, Param94: 0,
-          Param96: 0, Param87: 0, Param88: 0, Param97: 0,
+          Param9: 0,
+          Param10: 0,
+          Param12: 0,
+          Param95: 0,
+          Param94: 0,
+          Param96: 0,
+          Param87: 0,
+          Param88: 0,
+          Param97: 0,
         }
         const emotionMap: Record<string, Record<string, number>> = {
           angry: { Param9: 1 },
@@ -151,7 +158,7 @@ const emotionsQueue = createQueue<EmotionPayload>({
           question: { Param94: 1 },
           neutral: {},
         }
-        const params = { ...emotionResetParams, ...(emotionMap[ctx.data.name] ?? {}) }
+        const params = { ...emotionResetParams, ...emotionMap[ctx.data.name] }
         live2dStore.expressionParams = params
         console.debug('[Live2D] Applied emotion params:', ctx.data.name, params)
       }
@@ -171,31 +178,15 @@ delaysQueue.onHandlerEvent('delay', (delay) => {
   console.debug('delay detected', delay)
 })
 
-const ITEM_PARAM_MAP: Record<string, Record<string, number>> = {
-  glasses: { Param8: 1 },
-  hat: { Param11: 1 },
-  ears: { Param90: 1 },
-  bear: { Param5: 1, Param3: 1, Param152: 1 },
-  pillow: { Param123: 1 },
-  pen: { Param128: 1, Param4: 1, Param152: 1 },
-  game: { Param3: 1, Param152: 1 },
-  coat: { Param22: 1 },
-  sweater: { Param22: 1, Param147: 1, Param148: 1 },
-  earphones: { Param7: 1 },
-  eat: { Param6: 1, Param152: 1 },
-  mouse: { Param139: 1 },
-  whiteboard: { Param127: 1 },
-  'sticky note': { Param57: 1 },
-  none: {},
-}
-
 const itemsQueue = useItemMessageQueue()
-itemsQueue.onHandlerEvent('item', (itemName: string) => {
-  console.debug('item token detected', itemName)
-  const params = ITEM_PARAM_MAP[itemName]
-  if (params !== undefined) {
-    live2dStore.itemParams = { ...params }
-  }
+itemsQueue.onHandlerEvent('item', (cmd) => {
+  console.debug('item token detected', cmd)
+  if (cmd.category === 'handItem')
+    live2dStore.setHandItem(cmd.label)
+  else if (cmd.category === 'hairstyle')
+    live2dStore.setHairstyle(cmd.label)
+  else if (cmd.category === 'accessory')
+    live2dStore.setAccessory(cmd.label, cmd.on)
 })
 
 // Play special token: delay or emotion

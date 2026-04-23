@@ -66,31 +66,43 @@ export function useEmotionsMessageQueue(emotionsQueue: UseQueueReturn<EmotionPay
   })
 }
 
+export type ItemCommand
+  = | { category: 'handItem', label: string }
+    | { category: 'hairstyle', label: string }
+    | { category: 'accessory', label: string, on: boolean }
+
 export function useItemMessageQueue() {
-  function parseItemToken(content: string) {
+  function parseItemToken(content: string): ItemCommand | null {
     const match = /<\|ITEM\s*(?::\s*)?(\{[\s\S]*?\})\|>/i.exec(content)
     if (!match)
-      return { ok: false, item: null as string | null }
+      return null
 
+    let payload: Record<string, unknown>
     try {
-      const payload = JSON.parse(match[1]) as { name?: string }
-      if (payload?.name && typeof payload.name === 'string')
-        return { ok: true, item: payload.name.toLowerCase() }
+      payload = JSON.parse(match[1]) as Record<string, unknown>
     }
     catch (e) {
       console.warn(`[parseItemToken] Failed to parse ITEM payload: "${match[1]}"`, e)
+      return null
     }
 
-    return { ok: false, item: null as string | null }
+    if (typeof payload.handItem === 'string')
+      return { category: 'handItem', label: payload.handItem }
+    if (typeof payload.hairstyle === 'string')
+      return { category: 'hairstyle', label: payload.hairstyle }
+    if (typeof payload.accessory === 'string')
+      return { category: 'accessory', label: payload.accessory, on: payload.on !== false }
+
+    console.warn(`[parseItemToken] ITEM payload missing category field: ${JSON.stringify(payload)}`)
+    return null
   }
 
   return createQueue<string>({
     handlers: [
       async (ctx) => {
         const parsed = parseItemToken(ctx.data)
-        if (parsed.ok && parsed.item) {
-          ctx.emit('item', parsed.item)
-        }
+        if (parsed)
+          ctx.emit('item', parsed)
       },
     ],
   })

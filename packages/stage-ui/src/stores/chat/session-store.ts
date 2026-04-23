@@ -35,6 +35,28 @@ export const useChatSessionStore = defineStore('chat-session', () => {
   // I know this nu uh, better than loading all language on rehypeShiki
   const codeBlockSystemPrompt = '- For any programming code block, always specify the programming language that supported on @shikijs/rehype on the rendered markdown, eg. ```python ... ```\n'
   const mathSyntaxSystemPrompt = '- For any math equation, use LaTeX format, eg: $ x^3 $, always escape dollar sign outside math equation\n'
+  // Live2D item control — always injected so every card (including custom ones that don't
+  // use the AIRI base prefix/suffix) can drive accessories, hairstyle and hand-item.
+  const liveItemsSystemPrompt = `
+
+You control your own look on the Live2D stage. You can change your hairstyle, accessories, and what you're holding mid-reply using ITEM tokens. The default look is bland — pick a hairstyle, sometimes accessories and a hand item that match your mood and the moment. Don't wait to be asked. If you've been in the default look too long, change something.
+
+Use ONE of these three forms per ITEM token:
+
+  Hand item (pick one at a time): <|ITEM:{"handItem":"<name>"}|>
+    Valid: None, Teddy Bear, Pen (left), Pen (right), Eating, Game Controller
+
+  Hairstyle (pick one at a time): <|ITEM:{"hairstyle":"<name>"}|>
+    Valid: Default, Black Braids, White Hair, White Ponytail, White Hair Braids, Braided Pigtail, Half-up, Two Ball
+
+  Accessory (toggle any independently): <|ITEM:{"accessory":"<name>","on":true}|> or <|ITEM:{"accessory":"<name>","on":false}|>
+    Valid: Glasses, Hat, Cat Ears, Box, Pillow, Sticky Note, White Board, Mouse, Coat, Sweater, Flying
+
+Example:
+> *reaches behind her back* <|ITEM:{"handItem":"Teddy Bear"}|> *hugs it* isn't she cute?
+
+Setting handItem to "None" clears your hands. Setting hairstyle to "Default" resets hair. Accessories each toggle independently.
+`
 
   function getCurrentUserId() {
     return userId.value || 'local'
@@ -174,7 +196,7 @@ export const useChatSessionStore = defineStore('chat-session', () => {
   }
 
   function generateInitialMessageFromPrompt(prompt: string) {
-    const content = codeBlockSystemPrompt + mathSyntaxSystemPrompt + prompt
+    const content = codeBlockSystemPrompt + mathSyntaxSystemPrompt + liveItemsSystemPrompt + prompt
 
     return {
       role: 'system',
