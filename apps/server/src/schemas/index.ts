@@ -1,5 +1,6 @@
 export * from './accounts'
 export * from './characters'
 export * from './chats'
+export * from './memories'
 export * from './providers'
 export * from './user-character'

@@ -300,8 +300,15 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
         // the final non-tool finish to avoid ending the chat turn with no assistant reply.
         waitForTools: true,
         onStreamEvent: async (event: StreamEvent) => {
+          const isDebug = typeof localStorage !== 'undefined' && localStorage.getItem('airi:debug') === '1'
           switch (event.type) {
             case 'tool-call':
+              if (isDebug) {
+                let args: unknown
+                try { args = JSON.parse((event as any).argumentsRaw ?? (event as any).function?.arguments ?? '{}') }
+                catch { args = (event as any).argumentsRaw ?? (event as any).function?.arguments }
+                console.log('[tool] →', (event as any).toolName ?? (event as any).function?.name ?? '?', args)
+              }
               toolCallQueue.enqueue({
                 type: 'tool-call',
                 toolCall: event,
@@ -309,6 +316,11 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
 
               break
             case 'tool-result':
+              if (isDebug) {
+                const r = event.result
+                const preview = typeof r === 'string' ? r.slice(0, 300) : Array.isArray(r) ? r.map((p: any) => p?.text ?? '').join(' ').slice(0, 300) : r
+                console.log('[tool] ←', event.toolCallId, preview)
+              }
               toolCallQueue.enqueue({
                 type: 'tool-call-result',
                 id: event.toolCallId,

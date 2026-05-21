@@ -18,9 +18,14 @@ import { sessionMiddleware } from './middlewares/auth'
 import { otelMiddleware } from './middlewares/otel'
 import { createCharacterRoutes } from './routes/characters'
 import { createChatRoutes } from './routes/chats'
+import { createKnowledgeRoutes } from './routes/knowledge'
+import { createMemoryRoutes } from './routes/memory'
 import { createProviderRoutes } from './routes/providers'
+import { createWebRoutes } from './routes/web'
 import { createCharacterService } from './services/characters'
 import { createChatService } from './services/chats'
+import { createEmbeddingService } from './services/embedding'
+import { createMemoryService, ensureMemoryTable } from './services/memory'
 import { createProviderService } from './services/providers'
 import { ApiError, createInternalError } from './utils/error'
 import { getTrustedOrigin } from './utils/origin'
@@ -29,6 +34,7 @@ type AuthService = ReturnType<typeof createAuth>
 type CharacterService = ReturnType<typeof createCharacterService>
 type ChatService = ReturnType<typeof createChatService>
 type ProviderService = ReturnType<typeof createProviderService>
+type MemoryService = ReturnType<typeof createMemoryService>
 
 type OtelMetrics = ReturnType<typeof initOtel>
 
@@ -37,10 +43,13 @@ interface AppDeps {
   characterService: CharacterService
   chatService: ChatService
   providerService: ProviderService
+  memoryService: MemoryService
+  knowledgeRoot: string
+  searxngUrl: string
   otel: OtelMetrics | null
 }
 
-function buildApp({ auth, characterService, chatService, providerService, otel }: AppDeps) {
+function buildApp({ auth, characterService, chatService, providerService, memoryService, knowledgeRoot, searxngUrl, otel }: AppDeps) {
   const logger = useLogger('app').useGlobalConfig()
 
   const app = new Hono<HonoEnv>()
@@ -104,6 +113,21 @@ function buildApp({ auth, characterService, chatService, providerService, otel }
      * Chat routes are handled by the chat service.
      */
     .route('/api/chats', createChatRoutes(chatService))
+
+    /**
+     * Memory routes — Nova's backend brain (Alaya-compatible STM).
+     */
+    .route('/api/memory', createMemoryRoutes(memoryService))
+
+    /**
+     * Knowledge routes — sandboxed file search/read over the knowledge folder.
+     */
+    .route('/api/knowledge', createKnowledgeRoutes(knowledgeRoot))
+
+    /**
+     * Web routes — SearXNG-backed web search.
+     */
+    .route('/api/web', createWebRoutes(searxngUrl))
 }
 
 export type AppType = ReturnType<typeof buildApp>
@@ -159,13 +183,29 @@ async function createApp() {
     build: ({ dependsOn }) => createChatService(dependsOn.db),
   })
 
+  const embeddingService = injeca.provide('services:embedding', {
+    dependsOn: {},
+    build: () => createEmbeddingService(),
+  })
+
+  const memoryService = injeca.provide('services:memory', {
+    dependsOn: { db, embedding: embeddingService },
+    build: async ({ dependsOn }) => {
+      await ensureMemoryTable(dependsOn.db)
+      return createMemoryService(dependsOn.db, dependsOn.embedding)
+    },
+  })
+
   await injeca.start()
-  const resolved = await injeca.resolve({ auth, characterService, chatService, providerService, otel })
+  const resolved = await injeca.resolve({ auth, characterService, chatService, providerService, memoryService, env: parsedEnv, otel })
   const app = buildApp({
     auth: resolved.auth,
     characterService: resolved.characterService,
     chatService: resolved.chatService,
     providerService: resolved.providerService,
+    memoryService: resolved.memoryService,
+    knowledgeRoot: resolved.env.KNOWLEDGE_ROOT,
+    searxngUrl: resolved.env.SEARXNG_URL,
     otel: resolved.otel,
   })
 

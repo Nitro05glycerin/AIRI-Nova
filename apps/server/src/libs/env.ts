@@ -16,6 +16,10 @@ const EnvSchema = object({
   AUTH_GITHUB_CLIENT_ID: optional(string(), 'unused'),
   AUTH_GITHUB_CLIENT_SECRET: optional(string(), 'unused'),
 
+  // Backend brain
+  KNOWLEDGE_ROOT: optional(string(), '/home/florian/airi-knowledge'),
+  SEARXNG_URL: optional(string(), 'http://127.0.0.1:8888'),
+
   // OpenTelemetry
   OTEL_SERVICE_NAMESPACE: optional(string(), 'airi'),
   OTEL_SERVICE_NAME: optional(string(), 'server'),
