@@ -4,7 +4,7 @@
 
 A customized fork of [AIRI](https://github.com/moeru-ai/airi) with personality-driven Live2D companion features, built for self-hosting on a Hetzner server via Tailscale.
 
-This build is specifically made for the [bear Pajama Extended Version](https://kyoki.booth.pm/items/6333409) Live2D model by kyokiStudio. The model file is included in this repo for convenience — see [Setup](#setup) for how to import it.
+This build is specifically made for the [bear Pajama Extended Version](https://kyoki.booth.pm/items/6333409) Live2D model by kyokiStudio. The model isn't redistributed here — grab it from booth.pm and import it; see [Setup](#setup).
 
 ## What's Changed
 
@@ -27,6 +27,15 @@ This build is specifically made for the [bear Pajama Extended Version](https://k
 - Cards merge by ID (union), other settings use per-key timestamps (newer wins)
 - Per-key change tracking via `localStorage.setItem` interception
 - Position and scale excluded from sync (device-specific)
+
+### Memory & Tools
+- Long-term memory layer — PGlite + pgvector with local `Xenova/all-MiniLM-L6-v2` embeddings (no external embedding API)
+- Self-authored memory tools so Nova manages her own recall: `remember_about_user`, `correct_memory`, `forget_about_user` (single-purpose by design — DeepSeek calls specific tools reliably, generic ones poorly)
+- Provenance-tracked writes (`self` vs `user_confirmed`), non-destructive dedup, and soft-delete on forget so misfires are cheap and reversible
+- Automatic recall: relevant memories are retrieved and injected into context, gated by a tuned MiniLM cosine relevance floor to avoid noise
+- Memories also save themselves automatically from conversation, not just on explicit request
+- Editable memory curation page at `GET /api/memory/admin` — view, add, and delete what Nova remembers
+- Tool bridge with additional agent tools: `web_search`, plus `knowledge_search` / `knowledge_read` over a personal notes folder (`KNOWLEDGE_ROOT`)
 
 ### Self-Hosting
 - `serve-unified.py` — serves the SPA and proxies API, ElevenLabs, sync, and unspeech endpoints
@@ -62,18 +71,18 @@ This build is specifically made for the [bear Pajama Extended Version](https://k
 
 ### Importing the Live2D Model
 
-The model file (`bear_Pajama_Extended_Version.zip`) is included in the root of this repo.
+The model is not included in this repo. Purchase/download the [bear Pajama Extended Version](https://kyoki.booth.pm/items/6333409) zip from booth.pm.
 
 1. Open AIRI in your browser
 2. Go to **Settings > Display Model**
-3. Import the zip file from this repo
+3. Import the `bear_Pajama_Extended_Version.zip` you downloaded from booth.pm
 4. Select the bear Pajama model
 
 ### Accessing AIRI
 
 1. Make sure Tailscale is installed and running on your device
 2. Connect to the same Tailscale network as the Hetzner server
-3. Open https://ubuntu-8gb-nbg1-1.tailc2d5a7.ts.net:8443/ in your browser
+3. Open `https://<your-server>.<your-tailnet>.ts.net:8443/` in your browser
 
 ## Credits
 
