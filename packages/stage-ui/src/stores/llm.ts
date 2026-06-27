@@ -7,7 +7,7 @@ import { streamText } from '@xsai/stream-text'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { debug, files, mcp, web } from '../tools'
+import { debug, files, mcp, memory, web } from '../tools'
 
 export type StreamEvent
   = | { type: 'text-delta', text: string }
@@ -71,6 +71,7 @@ async function streamFrom(model: string, chatProvider: ChatProvider, messages: M
         ...await debug(),
         ...await files(),
         ...await web(),
+        ...await memory(),
         ...await resolveTools(),
       ]
     : undefined

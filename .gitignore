@@ -128,3 +128,15 @@ sync-data.json.bak
 test-results.txt
 test-emotion-outfit.py
 apps/server/pglite-data/
+
+# memory/sync rollback & backup artifacts (do not commit)
+.memrollback-*/
+dist.rollback-*/
+*.memory-backup-*.tar.gz
+sync-backups/
+sync-data.json.clobbered-*
+sync-data.json.predeploy-*
+sync-server.py.orig-*
+sync-meta.json
+sync-known-good.json
+sync-known-good.seed.json

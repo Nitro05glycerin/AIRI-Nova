@@ -4,12 +4,15 @@
  */
 
 export type MemoryKind = 'fact' | 'preference' | 'event' | 'context'
+export type MemorySource = 'extracted' | 'self' | 'user_confirmed'
 
 export interface MemoryWriteInput {
   text: string
   kind?: MemoryKind
   importance?: number
   characterId?: string
+  source?: MemorySource
+  confidence?: number
 }
 
 export interface MemoryRecallResult {

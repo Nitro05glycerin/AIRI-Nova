@@ -189,10 +189,20 @@ async function createApp() {
   })
 
   const memoryService = injeca.provide('services:memory', {
-    dependsOn: { db, embedding: embeddingService },
+    dependsOn: { db, embedding: embeddingService, lifecycle },
     build: async ({ dependsOn }) => {
       await ensureMemoryTable(dependsOn.db)
-      return createMemoryService(dependsOn.db, dependsOn.embedding)
+      const service = createMemoryService(dependsOn.db, dependsOn.embedding)
+      // Preload the local embedding model so the first recall (800ms budget)
+      // doesn't silently time out while MiniLM downloads/initialises.
+      void service.warm()
+      // Retention: hard-prune rows past the soft-delete undo window now and daily,
+      // so the table can't grow unbounded with tombstones. Errors are non-fatal.
+      void service.pruneSoftDeleted()
+      const pruneTimer = setInterval(() => void service.pruneSoftDeleted().catch(() => {}), 24 * 60 * 60 * 1000)
+      pruneTimer.unref?.()
+      dependsOn.lifecycle.appHooks.onStop(() => clearInterval(pruneTimer))
+      return service
     },
   })
 
