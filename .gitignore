@@ -140,3 +140,6 @@ sync-server.py.orig-*
 sync-meta.json
 sync-known-good.json
 sync-known-good.seed.json
+
+# large vtuber model — do not commit
+bear_Pajama_Extended_Version.zip
